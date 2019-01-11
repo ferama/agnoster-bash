@@ -50,19 +50,6 @@
 # jobs are running in this shell will all be displayed automatically when
 # appropriate.
 
-# Generally speaking, this script has limited support for right
-# prompts (ala powerlevel9k on zsh), but it's pretty problematic in Bash.
-# The general pattern is to write out the right prompt, hit \r, then
-# write the left. This is problematic for the following reasons:
-# - Doesn't properly resize dynamically when you resize the terminal
-# - Changes to the prompt (like clearing and re-typing, super common) deletes the prompt
-# - Getting the right alignment via columns / tput cols is pretty problematic (and is a bug in this version)
-# - Bash prompt escapes (like \h or \w) don't get interpolated
-#
-# all in all, if you really, really want right-side prompts without a
-# ton of work, recommend going to zsh for now. If you know how to fix this,
-# would appreciate it!
-
 # note: requires bash v4+... Mac users - you often have bash3.
 # 'brew install bash' will set you free
 PROMPT_DIRTRIM=2 # bash4 and above
@@ -274,30 +261,6 @@ prompt_status() {
     [[ -n "$symbols" ]] && prompt_segment black default "$symbols"
 }
 
-######################################################################
-#
-# experimental right prompt stuff
-# requires setting prompt_foo to use PRIGHT vs PR
-# doesn't quite work per above
-
-rightprompt() {
-    printf "%*s" $COLUMNS "$PRIGHT"
-}
-
-# quick right prompt I grabbed to test things.
-__command_rprompt() {
-    local times= n=$COLUMNS tz
-    for tz in ZRH:Europe/Zurich PIT:US/Eastern \
-              MTV:US/Pacific TOK:Asia/Tokyo; do
-        [ $n -gt 40 ] || break
-        times="$times ${tz%%:*}\e[30;1m:\e[0;36;1m"
-        times="$times$(TZ=${tz#*:} date +%H:%M)\e[0m"
-        n=$(( $n - 10 ))
-    done
-    [ -z "$times" ] || printf "%${n}s$times\\r" ''
-}
-# PROMPT_COMMAND=__command_rprompt
-
 # this doens't wrap code in \[ \]
 ansi_r() {
     local seq
@@ -317,82 +280,10 @@ ansi_r() {
     # PR="$PR\[\033[${seq}m\]"
 }
 
-# Begin a segment on the right
-# Takes two arguments, background and foreground. Both can be omitted,
-# rendering default background/foreground.
-prompt_right_segment() {
-    local bg fg
-    declare -a codes
-
-    debug "Prompt right"
-    debug "Prompting $1 $2 $3"
-
-    # if commented out from kruton's original... I'm not clear
-    # if it did anything, but it messed up things like
-    # prompt_status - Erik 1/14/17
-
-    #    if [[ -z $1 || ( -z $2 && $2 != default ) ]]; then
-    codes=("${codes[@]}" $(text_effect reset))
-    #    fi
-    if [[ -n $1 ]]; then
-        bg=$(bg_color $1)
-        codes=("${codes[@]}" $bg)
-        debug "Added $bg as background to codes"
-    fi
-    if [[ -n $2 ]]; then
-        fg=$(fg_color $2)
-        codes=("${codes[@]}" $fg)
-        debug "Added $fg as foreground to codes"
-    fi
-
-    debug "Right Codes: "
-    # declare -p codes
-
-    # right always has a separator
-    # if [[ $CURRENT_RBG != NONE && $1 != $CURRENT_RBG ]]; then
-    #     $CURRENT_RBG=
-    # fi
-    declare -a intermediate2=($(fg_color $1) $(bg_color $CURRENT_RBG) )
-    # PRIGHT="$PRIGHT---"
-    debug "pre prompt " $(ansi_r intermediate2[@])
-    PRIGHT="$PRIGHT$(ansi_r intermediate2[@])$RIGHT_SEPARATOR"
-    debug "post prompt " $(ansi_r codes[@])
-    PRIGHT="$PRIGHT$(ansi_r codes[@]) "
-    # else
-    #     debug "no current BG, codes is $codes[@]"
-    #     PRIGHT="$PRIGHT$(ansi codes[@]) "
-    # fi
-    CURRENT_RBG=$1
-    [[ -n $3 ]] && PRIGHT="$PRIGHT$3"
-}
-
-######################################################################
-## Emacs prompt --- for dir tracking
-# stick the following in your .emacs if you use this:
-
-# (setq dirtrack-list '(".*DIR *\\([^ ]*\\) DIR" 1 nil))
-# (defun dirtrack-filter-out-pwd-prompt (string)
-#   "dirtrack-mode doesn't remove the PWD match from the prompt.  This does."
-#   ;; TODO: support dirtrack-mode's multiline regexp.
-#   (if (and (stringp string) (string-match (first dirtrack-list) string))
-#       (replace-match "" t t string 0)
-#     string))
-# (add-hook 'shell-mode-hook
-#           #'(lambda ()
-#               (dirtrack-mode 1)
-#               (add-hook 'comint-preoutput-filter-functions
-#                         'dirtrack-filter-out-pwd-prompt t t)))
-
-prompt_emacsdir() {
-    # no color or other setting... this will be deleted per above
-    PR="DIR \w DIR$PR"
-}
-
 ######################################################################
 ## Main prompt
 
 build_prompt() {
-    [[ ! -z ${AG_EMACS_DIR+x} ]] && prompt_emacsdir
     prompt_status
     #[[ -z ${AG_NO_HIST+x} ]] && prompt_histdt
     [[ -z ${AG_NO_CONTEXT+x} ]] && prompt_context
@@ -414,9 +305,6 @@ set_bash_prompt() {
     CURRENT_BG=NONE
     PR="$(ansi_single $(text_effect reset))"
     build_prompt
-
-    # uncomment below to use right prompt
-    #     PS1='\[$(tput sc; printf "%*s" $COLUMNS "$PRIGHT"; tput rc)\]'$PR
     PS1=$PR
 }
 
